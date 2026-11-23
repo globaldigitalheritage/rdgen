@@ -788,6 +788,35 @@ jobs:
             exit 1
           fi
 
+      # GDH PATCH: publish the finished installers as a workflow artifact so
+      # they can be fetched with `gh run download`, instead of only being
+      # POSTed to a reachable rdgen server. This is what lets us build with no
+      # hosted service and nothing exposed to the internet - rdgen's Django app
+      # has no authentication of any kind, so GENURL must never be public.
+      # See docs/cortendesk-clients.md in globaldigitalheritage/infrastructure.
+      - name: GDH upload installers as artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdh-client-${{ env.filename }}
+          # Every platform writes its finished file somewhere different:
+          # windows/sh -> SignOutput, windows-x86 -> SignOutput+Release,
+          # linux -> output/appimage/flatpak, android -> signed-apk,
+          # macos -> $GITHUB_WORKSPACE root. Listing all of them keeps this
+          # one patch valid for every generator; if-no-files-found: warn means
+          # the irrelevant ones are simply skipped.
+          path: |
+            ./SignOutput/*
+            ./output/*
+            ./Release/*.exe
+            ./signed-apk/*
+            ./*.dmg
+            ./appimage/*.AppImage
+            ./flatpak/*.flatpak
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         shell: bash
